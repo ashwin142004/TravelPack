@@ -4,19 +4,31 @@ import os
 
 db = None
 
+import json
+
 def initialize_firebase():
     global db
     try:
-        # Check if service account file exists
+        # 1. Check for environment variable (Production)
+        firebase_creds = os.getenv('FIREBASE_CREDENTIALS')
+        if firebase_creds:
+            cred_dict = json.loads(firebase_creds)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            print("Firebase initialized from Environment Variable.")
+            return True
+            
+        # 2. Check for service account file (Local Development)
         cred_path = 'serviceAccountKey.json'
         if os.path.exists(cred_path):
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
             db = firestore.client()
-            print("Firebase initialized successfully.")
+            print("Firebase initialized from File.")
             return True
         else:
-            print("Warning: serviceAccountKey.json not found. Firebase features will not work.")
+            print("Warning: serviceAccountKey.json not found and FIREBASE_CREDENTIALS not set.")
             return False
     except Exception as e:
         print(f"Error initializing Firebase: {e}")
