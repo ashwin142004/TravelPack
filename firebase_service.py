@@ -71,13 +71,15 @@ def get_trip(trip_id):
         if doc.exists:
             trip = doc.to_dict()
             trip['id'] = doc.id
+            if 'categories' not in trip:
+                trip['categories'] = ['General', 'Clothing', 'Toiletries', 'Electronics', 'Documents']
             return trip
         return None
     except Exception as e:
         print(f"Error fetching trip: {e}")
         return None
 
-def add_trip(user_id, name, location, owner_email=None):
+def add_trip(user_id, name, location, start_date=None, end_date=None, owner_email=None):
     if not db:
         return
     try:
@@ -87,6 +89,9 @@ def add_trip(user_id, name, location, owner_email=None):
             'shared_with': [],
             'name': name,
             'location': location,
+            'start_date': start_date,
+            'end_date': end_date,
+            'categories': ['General', 'Clothing', 'Toiletries', 'Electronics', 'Documents'],
             'created_at': firestore.SERVER_TIMESTAMP
         })
     except Exception as e:
@@ -113,6 +118,30 @@ def delete_trip(trip_id):
     except Exception as e:
         print(f"Error deleting trip: {e}")
 
+def add_category_to_trip(trip_id, category_name):
+    if not db:
+        return False
+    try:
+        db.collection('trips').document(trip_id).update({
+            'categories': firestore.ArrayUnion([category_name])
+        })
+        return True
+    except Exception as e:
+        print(f"Error adding category: {e}")
+        return False
+
+def remove_category_from_trip(trip_id, category_name):
+    if not db:
+        return False
+    try:
+        db.collection('trips').document(trip_id).update({
+            'categories': firestore.ArrayRemove([category_name])
+        })
+        return True
+    except Exception as e:
+        print(f"Error removing category: {e}")
+        return False
+
 # Packing List Functions
 def get_packing_items(trip_id):
     if not db:
@@ -124,13 +153,25 @@ def get_packing_items(trip_id):
         for doc in query:
             item = doc.to_dict()
             item['id'] = doc.id
+            # Format timestamp for display
+            if 'created_at' in item and item['created_at']:
+                # Convert Firestore Timestamp to datetime value 
+                dt = item['created_at']
+                # Check if it's already a datetime object (sometimes wrapper handles it) or Timestamp
+                if hasattr(dt, 'strftime'):
+                     item['created_at_formatted'] = dt.strftime('%b %d, %I:%M %p')
+                else: 
+                     # Fallback if it's cleaner to handle plain retrieval
+                     item['created_at_formatted'] = ''
+            else:
+                 item['created_at_formatted'] = ''
             items.append(item)
         return items
     except Exception as e:
         print(f"Error fetching packing items: {e}")
         return []
 
-def add_packing_item(trip_id, text, category='General'):
+def add_packing_item(trip_id, text, category='General', added_by_email=None, added_by_name=None):
     if not db:
         return
     try:
@@ -138,6 +179,8 @@ def add_packing_item(trip_id, text, category='General'):
             'trip_id': trip_id,
             'text': text,
             'category': category,
+            'added_by_email': added_by_email,
+            'added_by_name': added_by_name,
             'is_completed': False,
             'created_at': firestore.SERVER_TIMESTAMP
         })

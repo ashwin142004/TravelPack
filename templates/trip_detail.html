@@ -10,7 +10,15 @@
             </ol>
         </nav>
         <h2>{{ trip.name }}</h2>
-        <p class="text-muted">{{ trip.location }}</p>
+        <p class="text-muted mb-1">{{ trip.location }}</p>
+        {% if trip.start_date or trip.end_date %}
+        <p class="small text-muted">
+            <i class="bi bi-calendar-event"></i>
+            {% if trip.start_date %}{{ trip.start_date }}{% endif %}
+            {% if trip.start_date and trip.end_date %} - {% endif %}
+            {% if trip.end_date %}{{ trip.end_date }}{% endif %}
+        </p>
+        {% endif %}
     </div>
 </div>
 
@@ -23,6 +31,10 @@
                     <button class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal"
                         data-bs-target="#shareTripModal">
                         <i class="bi bi-person-plus-fill"></i> Share
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal"
+                        data-bs-target="#manageCategoriesModal">
+                        <i class="bi bi-tags"></i> Manage Categories
                     </button>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
                         + Add Item
@@ -59,6 +71,15 @@
                                             <span>{{ item.text }}</span>
                                             {% endif %}
                                         </a>
+                                        {% if item.added_by_name %}
+                                        <div class="ms-3">
+                                            <small class="text-muted" style="font-size: 0.75rem;">
+                                                Added by {{ item.added_by_name }}
+                                                {% if item.created_at_formatted %} on {{ item.created_at_formatted }}{%
+                                                endif %}
+                                            </small>
+                                        </div>
+                                        {% endif %}
                                     </div>
                                     <a href="{{ url_for('delete_item', item_id=item.id, trip_id=trip.id) }}"
                                         class="btn btn-link text-danger p-0">
@@ -143,11 +164,9 @@
                     <div class="mb-3">
                         <label for="category" class="form-label">Category</label>
                         <select class="form-select" id="category" name="category">
-                            <option value="General">General</option>
-                            <option value="Clothing">Clothing</option>
-                            <option value="Toiletries">Toiletries</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="Documents">Documents</option>
+                            {% for cat in sorted_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                 </div>
@@ -156,6 +175,39 @@
                     <button type="submit" class="btn btn-primary">Add Item</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div class="modal fade" id="manageCategoriesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Categories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('add_category_route', trip_id=trip.id) }}" method="POST" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="category_name" placeholder="New Category Name"
+                            required>
+                        <button class="btn btn-outline-primary" type="submit">Add</button>
+                    </div>
+                </form>
+                <h6>Current Categories:</h6>
+                <ul class="list-group list-group-flush">
+                    {% for cat in sorted_categories %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ cat }}
+                        <a href="{{ url_for('delete_category_route', trip_id=trip.id, category_name=cat) }}"
+                            class="text-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
 </div>

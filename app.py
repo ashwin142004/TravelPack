@@ -67,9 +67,11 @@ def create_trip():
     
     name = request.form.get('name')
     location = request.form.get('location')
+    start_date = request.form.get('start_date')
+    end_date = request.form.get('end_date')
     
     if name:
-        add_trip(user.get('sub'), name, location)
+        add_trip(user.get('sub'), name, location, start_date=start_date, end_date=end_date)
     
     return redirect(url_for('home'))
 
@@ -105,8 +107,16 @@ def trip_detail(trip_id):
             grouped_items[cat] = []
         grouped_items[cat].append(item)
         
-    # Sort categories (optional, but nice)
-    sorted_categories = sorted(grouped_items.keys())
+    # Sort categories
+    # Use categories from trip if available (it should be now), or fallback to keys in grouped_items
+    # But we want to show ALL categories available for the trip, even if empty
+    available_categories = trip.get('categories', [])
+    # Ensure all used categories are in the list (in case of legacy data not in array)
+    for cat in grouped_items.keys():
+        if cat not in available_categories:
+            available_categories.append(cat)
+            
+    sorted_categories = sorted(available_categories)
     
     return render_template('trip_detail.html', user=user, trip=trip, grouped_items=grouped_items, sorted_categories=sorted_categories)
 
@@ -121,7 +131,9 @@ def add_item(trip_id):
     
     if text:
         from firebase_service import add_packing_item
-        add_packing_item(trip_id, text, category)
+        added_by_email = user.get('email')
+        added_by_name = user.get('name', added_by_email) # Fallback to email if name is missing
+        add_packing_item(trip_id, text, category, added_by_email=added_by_email, added_by_name=added_by_name)
         
     return redirect(url_for('trip_detail', trip_id=trip_id))
 
@@ -160,6 +172,31 @@ def share_trip_route(trip_id):
         else:
             flash('Error sharing trip.', 'danger')
         
+    return redirect(url_for('trip_detail', trip_id=trip_id))
+
+@app.route('/trip/<trip_id>/add_category', methods=['POST'])
+def add_category_route(trip_id):
+    user = session.get('user')
+    if not user:
+        return redirect(url_for('index'))
+        
+    category_name = request.form.get('category_name')
+    
+    if category_name:
+        from firebase_service import add_category_to_trip
+        add_category_to_trip(trip_id, category_name)
+        
+    return redirect(url_for('trip_detail', trip_id=trip_id))
+
+@app.route('/trip/<trip_id>/delete_category/<category_name>')
+def delete_category_route(trip_id, category_name):
+    user = session.get('user')
+    if not user:
+        return redirect(url_for('index'))
+        
+    from firebase_service import remove_category_from_trip
+    remove_category_from_trip(trip_id, category_name)
+    
     return redirect(url_for('trip_detail', trip_id=trip_id))
 
 
