@@ -99,6 +99,18 @@ def trip_detail(trip_id):
         
     items = get_packing_items(trip_id)
     
+    # Extract unique users for filter
+    contributors = set()
+    for item in items:
+        if item.get('added_by_name'):
+            contributors.add(item.get('added_by_name'))
+    sorted_contributors = sorted(list(contributors))
+    
+    # Filter by user if requested
+    filter_user = request.args.get('filter_user')
+    if filter_user:
+        items = [i for i in items if i.get('added_by_name') == filter_user]
+    
     # Group items by category
     grouped_items = {}
     for item in items:
@@ -118,7 +130,7 @@ def trip_detail(trip_id):
             
     sorted_categories = sorted(available_categories)
     
-    return render_template('trip_detail.html', user=user, trip=trip, grouped_items=grouped_items, sorted_categories=sorted_categories)
+    return render_template('trip_detail.html', user=user, trip=trip, grouped_items=grouped_items, sorted_categories=sorted_categories, contributors=sorted_contributors, active_filter=filter_user)
 
 @app.route('/trip/<trip_id>/add_item', methods=['POST'])
 def add_item(trip_id):
@@ -126,16 +138,23 @@ def add_item(trip_id):
     if not user:
         return redirect(url_for('index'))
         
-    text = request.form.get('text')
+    text_block = request.form.get('text')
     category = request.form.get('category', 'General')
+    note = request.form.get('note')
     
-    if text:
+    if text_block:
         from firebase_service import add_packing_item
         added_by_email = user.get('email')
-        added_by_name = user.get('name', added_by_email) # Fallback to email if name is missing
-        add_packing_item(trip_id, text, category, added_by_email=added_by_email, added_by_name=added_by_name)
+        added_by_name = user.get('name', added_by_email)
         
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+        # Split text by newline to handle bulk entry
+        items = [line.strip() for line in text_block.splitlines() if line.strip()]
+        
+        for item_text in items:
+            add_packing_item(trip_id, item_text, category, added_by_email=added_by_email, added_by_name=added_by_name, note=note)
+        
+    filter_user = request.form.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 @app.route('/item/<item_id>/toggle/<trip_id>')
 def toggle_item(item_id, trip_id):
@@ -155,7 +174,22 @@ def toggle_item(item_id, trip_id):
     from firebase_service import toggle_packing_item
     toggle_packing_item(item_id, current_status)
     
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+    filter_user = request.args.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
+
+@app.route('/item/<item_id>/update_note/<trip_id>', methods=['POST'])
+def update_note_route(item_id, trip_id):
+    user = session.get('user')
+    if not user:
+        return redirect(url_for('index'))
+        
+    new_note = request.form.get('note')
+    
+    from firebase_service import update_packing_item_note
+    update_packing_item_note(item_id, new_note)
+    
+    filter_user = request.form.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 @app.route('/trip/<trip_id>/share', methods=['POST'])
 def share_trip_route(trip_id):
@@ -172,7 +206,8 @@ def share_trip_route(trip_id):
         else:
             flash('Error sharing trip.', 'danger')
         
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+    filter_user = request.form.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 @app.route('/trip/<trip_id>/add_category', methods=['POST'])
 def add_category_route(trip_id):
@@ -186,7 +221,8 @@ def add_category_route(trip_id):
         from firebase_service import add_category_to_trip
         add_category_to_trip(trip_id, category_name)
         
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+    filter_user = request.form.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 @app.route('/trip/<trip_id>/delete_category/<category_name>')
 def delete_category_route(trip_id, category_name):
@@ -197,7 +233,8 @@ def delete_category_route(trip_id, category_name):
     from firebase_service import remove_category_from_trip
     remove_category_from_trip(trip_id, category_name)
     
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+    filter_user = request.args.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 
 
@@ -210,7 +247,8 @@ def delete_item(item_id, trip_id):
     from firebase_service import delete_packing_item
     delete_packing_item(item_id)
     
-    return redirect(url_for('trip_detail', trip_id=trip_id))
+    filter_user = request.args.get('filter_user')
+    return redirect(url_for('trip_detail', trip_id=trip_id, filter_user=filter_user))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

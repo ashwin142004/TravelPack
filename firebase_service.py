@@ -148,20 +148,38 @@ def get_packing_items(trip_id):
         return []
     try:
         items_ref = db.collection('packing_items')
-        query = items_ref.where('trip_id', '==', trip_id).stream()
+        
+        try:
+            # Try fetching ordered by created_at (requires composite index)
+            query = items_ref.where('trip_id', '==', trip_id).order_by('created_at', direction=firestore.Query.ASCENDING).stream()
+            # Convert to list to trigger execution and potential error
+            doc_list = list(query)
+        except Exception:
+            # Index missing or query failed. Falling back to in-memory sorting.
+            # This is expected behavior until the index is built.
+            query = items_ref.where('trip_id', '==', trip_id).stream()
+            doc_list = list(query)
+            # Sort manually by created_at (handling None values safely)
+            doc_list.sort(key=lambda x: x.to_dict().get('created_at') or 0)
+
         items = []
-        for doc in query:
+        for doc in doc_list:
             item = doc.to_dict()
             item['id'] = doc.id
-            # Format timestamp for display
+            # Format timestamp for display (IST: UTC+5:30)
             if 'created_at' in item and item['created_at']:
                 # Convert Firestore Timestamp to datetime value 
                 dt = item['created_at']
                 # Check if it's already a datetime object (sometimes wrapper handles it) or Timestamp
                 if hasattr(dt, 'strftime'):
-                     item['created_at_formatted'] = dt.strftime('%b %d, %I:%M %p')
+                    # Create a fixed timezone offset for IST (UTC+5:30) without external deps if possible,
+                    # but datetime.timezone is available in Python 3.2+
+                    from datetime import timezone, timedelta
+                    ist = timezone(timedelta(hours=5, minutes=30))
+                    # dt from firestore is usually timezone-aware UTC. Convert to IST.
+                    dt_ist = dt.astimezone(ist)
+                    item['created_at_formatted'] = dt_ist.strftime('%b %d, %I:%M %p')
                 else: 
-                     # Fallback if it's cleaner to handle plain retrieval
                      item['created_at_formatted'] = ''
             else:
                  item['created_at_formatted'] = ''
@@ -171,7 +189,7 @@ def get_packing_items(trip_id):
         print(f"Error fetching packing items: {e}")
         return []
 
-def add_packing_item(trip_id, text, category='General', added_by_email=None, added_by_name=None):
+def add_packing_item(trip_id, text, category='General', added_by_email=None, added_by_name=None, note=None):
     if not db:
         return
     try:
@@ -181,6 +199,7 @@ def add_packing_item(trip_id, text, category='General', added_by_email=None, add
             'category': category,
             'added_by_email': added_by_email,
             'added_by_name': added_by_name,
+            'note': note,
             'is_completed': False,
             'created_at': firestore.SERVER_TIMESTAMP
         })
@@ -204,3 +223,15 @@ def delete_packing_item(item_id):
         db.collection('packing_items').document(item_id).delete()
     except Exception as e:
         print(f"Error deleting item: {e}")
+
+def update_packing_item_note(item_id, new_note):
+    if not db:
+        return False
+    try:
+        db.collection('packing_items').document(item_id).update({
+            'note': new_note
+        })
+        return True
+    except Exception as e:
+        print(f"Error updating note: {e}")
+        return False
