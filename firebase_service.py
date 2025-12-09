@@ -216,6 +216,7 @@ def toggle_packing_item(item_id, current_status):
     except Exception as e:
         print(f"Error toggling item: {e}")
 
+
 def delete_packing_item(item_id):
     if not db:
         return
@@ -223,6 +224,21 @@ def delete_packing_item(item_id):
         db.collection('packing_items').document(item_id).delete()
     except Exception as e:
         print(f"Error deleting item: {e}")
+
+def delete_packing_item_by_text(trip_id, text):
+    if not db:
+        return
+    try:
+        # Find items with matching text in the trip
+        # Limit to 1 to avoid accidental mass deletion, but ideally we'd pass an ID.
+        # AI works with names, so we'll delete the first match.
+        docs = db.collection('packing_items').where('trip_id', '==', trip_id).where('text', '==', text).stream()
+        for doc in docs:
+            doc.reference.delete()
+            # Only delete one
+            return
+    except Exception as e:
+        print(f"Error deleting item by text: {e}")
 
 def update_packing_item_note(item_id, new_note):
     if not db:
@@ -234,4 +250,73 @@ def update_packing_item_note(item_id, new_note):
         return True
     except Exception as e:
         print(f"Error updating note: {e}")
+        return False
+
+# Private Notes Functions
+def get_user_trip_note(trip_id, user_id):
+    if not db:
+        return []
+    try:
+        doc = db.collection('trips').document(trip_id).collection('private_notes').document(user_id).get()
+        if doc.exists:
+            data = doc.to_dict()
+            # Return the list of notes, defaulting to empty list
+            if 'notes' in data:
+                notes = data['notes']
+                # Ensure created_at is string
+                for note in notes:
+                    if 'created_at' in note and not isinstance(note['created_at'], str):
+                         # Try simple string conversion or isoformat
+                         try:
+                             note['created_at'] = note['created_at'].isoformat()
+                         except:
+                             note['created_at'] = str(note['created_at'])
+                return notes
+            elif 'content' in data:
+                # Migrate old single note to list
+                created = data.get('updated_at')
+                if created and not isinstance(created, str):
+                    try:
+                        created = created.isoformat()
+                    except:
+                        created = str(created)
+                return [{'id': 'legacy', 'text': data['content'], 'created_at': created}]
+        return []
+    except Exception as e:
+        print(f"Error fetching private notes: {e}")
+        return []
+
+def save_user_trip_note(trip_id, user_id, content):
+    if not db:
+        return False
+    try:
+        # Create a new note object
+        import uuid
+        from datetime import datetime
+        
+        new_note = {
+            'id': str(uuid.uuid4()),
+            'text': content,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        doc_ref = db.collection('trips').document(trip_id).collection('private_notes').document(user_id)
+        
+        # Use array_union to append
+        # Note: array_union might not work well if we want to store complex objects unless they are exact matches? 
+        # Actually for appending new unique objects it's fine.
+        # But to be safe and allow setting fields, let's use set with merge if doc doesn't exist, 
+        # or update if it does.
+        
+        # Checking existence to decide between set (create) and update (append) is one way.
+        # Or just use set(..., merge=True) with array_union.
+        
+        doc_ref.set({
+            'notes': firestore.ArrayUnion([new_note]),
+            'updated_at': firestore.SERVER_TIMESTAMP
+        }, merge=True)
+        
+        return True
+    except Exception as e:
+        print(f"Error saving private note: {e}")
         return False

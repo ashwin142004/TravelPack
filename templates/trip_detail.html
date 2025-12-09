@@ -24,121 +24,269 @@
 
 <div class="row">
     <div class="col-md-12">
-        <div class="card shadow-sm">
-            <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
-                <h5 class="mb-0">Packing List</h5>
-                <div class="d-flex align-items-center flex-wrap gap-2 mt-2 mt-md-0">
-                    <!-- Filter -->
-                    {% if contributors %}
-                    <form action="{{ url_for('trip_detail', trip_id=trip.id) }}" method="GET"
-                        class="d-flex align-items-center">
-                        <select name="filter_user" class="form-select form-select-sm" onchange="this.form.submit()"
-                            style="max-width: 150px;">
-                            <option value="">All Users</option>
-                            {% for contributor in contributors %}
-                            <option value="{{ contributor }}" {% if active_filter==contributor %}selected{% endif %}>{{
-                                contributor }}</option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                    {% endif %}
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" id="tripTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link {% if not request.args.get('active_tab') or request.args.get('active_tab') == 'packing' %}active{% endif %}"
+                    id="packing-tab" data-bs-toggle="tab" data-bs-target="#packing" type="button" role="tab"
+                    aria-controls="packing" aria-selected="true">Packing List</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if request.args.get('active_tab') == 'notes' %}active{% endif %}"
+                    id="notes-tab" data-bs-toggle="tab" data-bs-target="#notes" type="button" role="tab"
+                    aria-controls="notes" aria-selected="false">Private Notes</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if request.args.get('active_tab') == 'ai' %}active{% endif %}" id="ai-tab"
+                    data-bs-toggle="tab" data-bs-target="#ai" type="button" role="tab" aria-controls="ai"
+                    aria-selected="false">AI Assistant</button>
+            </li>
+        </ul>
 
-                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
-                        data-bs-target="#shareTripModal">
-                        <i class="bi bi-person-plus-fill"></i> Share
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
-                        data-bs-target="#manageCategoriesModal">
-                        <i class="bi bi-tags"></i> Categories
-                    </button>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
-                        + Add Items
-                    </button>
-                </div>
-            </div>
+        <div class="tab-content" id="tripTabsContent">
+            <!-- Packing List Tab -->
+            <div class="tab-pane fade {% if not request.args.get('active_tab') or request.args.get('active_tab') == 'packing' %}show active{% endif %}"
+                id="packing" role="tabpanel" aria-labelledby="packing-tab">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap py-3">
+                        <h5 class="mb-0 text-primary fw-bold">Packing List</h5>
+                        <div class="d-flex align-items-center flex-wrap gap-2 mt-2 mt-md-0">
+                            <!-- Filter -->
+                            {% if contributors %}
+                            <form action="{{ url_for('trip_detail', trip_id=trip.id) }}" method="GET"
+                                class="d-flex align-items-center">
+                                <select name="filter_user" class="form-select form-select-sm border-secondary-subtle"
+                                    onchange="this.form.submit()" style="max-width: 150px;">
+                                    <option value="">All Users</option>
+                                    {% for contributor in contributors %}
+                                    <option value="{{ contributor }}" {% if active_filter==contributor %}selected{%
+                                        endif %}>{{ contributor }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% endif %}
 
-            <div class="accordion accordion-flush" id="packingListAccordion">
-                {% if grouped_items %}
-                {% for category in sorted_categories %}
-                {% if grouped_items[category] %}
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="heading{{ loop.index }}">
-                        <button class="accordion-button" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#collapse{{ loop.index }}" aria-expanded="true"
-                            aria-controls="collapse{{ loop.index }}">
-                            {{ category }}
-                            <span class="badge bg-primary rounded-pill ms-2">{{ grouped_items[category]|length }}</span>
-                        </button>
-                    </h2>
-                    <div id="collapse{{ loop.index }}" class="accordion-collapse collapse show"
-                        aria-labelledby="heading{{ loop.index }}">
-                        <div class="accordion-body p-0">
-                            <ul class="list-group list-group-flush">
-                                {% for item in grouped_items[category] %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center ps-4 py-3">
-                                    <div class="d-flex align-items-start">
-                                        <a href="{{ url_for('toggle_item', item_id=item.id, trip_id=trip.id, status=item.is_completed, filter_user=active_filter) }}"
-                                            class="text-decoration-none text-body d-flex align-items-start">
-                                            {% if item.is_completed %}
-                                            <i class="bi bi-check-circle-fill text-success me-2 mt-1"></i>
-                                            <div>
-                                                <span class="text-decoration-line-through text-muted">{{ item.text
-                                                    }}</span>
-                                                {% else %}
-                                                <i class="bi bi-circle text-secondary me-2 mt-1"></i>
-                                                <div>
-                                                    <span>{{ item.text }}</span>
-                                                    {% endif %}
-                                                    {% if item.note %}
-                                                    <div class="text-muted fst-italic small">
-                                                        {{ item.note }}
-                                                        <a href="#" class="text-secondary ms-1" data-bs-toggle="modal"
-                                                            data-bs-target="#editNoteModal" data-item-id="{{ item.id }}"
-                                                            data-item-note="{{ item.note }}"
-                                                            onclick="setupEditNote(this)">
-                                                            <i class="bi bi-pencil-fill" style="font-size: 0.7em;"></i>
-                                                        </a>
-                                                    </div>
-                                                    {% else %}
-                                                    <div class="small">
-                                                        <a href="#" class="text-muted text-decoration-none"
-                                                            data-bs-toggle="modal" data-bs-target="#editNoteModal"
-                                                            data-item-id="{{ item.id }}" data-item-note=""
-                                                            onclick="setupEditNote(this)">
-                                                            <i class="bi bi-pencil-fill" style="font-size: 0.7em;"></i>
-                                                            <span class="fst-italic">Add Note</span>
-                                                        </a>
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                data-bs-target="#shareTripModal">
+                                <i class="bi bi-person-plus-fill"></i> Share
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal"
+                                data-bs-target="#addReminderModal" onclick="setReminderSource('trip')">
+                                <i class="bi bi-bell"></i> Reminder
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
+                                data-bs-target="#manageCategoriesModal">
+                                <i class="bi bi-tags"></i> Categories
+                            </button>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#addItemModal">
+                                + Add Items
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <div class="accordion accordion-flush" id="packingListAccordion">
+                            {% if grouped_items %}
+                            {% for category in sorted_categories %}
+                            {% if grouped_items[category] %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#collapse{{ loop.index }}" aria-expanded="true"
+                                        aria-controls="collapse{{ loop.index }}">
+                                        <span class="fw-semibold">{{ category }}</span>
+                                        <span class="badge bg-primary-subtle text-primary rounded-pill ms-2">{{
+                                            grouped_items[category]|length }}</span>
+                                    </button>
+                                </h2>
+                                <div id="collapse{{ loop.index }}" class="accordion-collapse collapse show"
+                                    aria-labelledby="heading{{ loop.index }}">
+                                    <div class="accordion-body p-0">
+                                        <ul class="list-group list-group-flush">
+                                            {% for item in grouped_items[category] %}
+                                            <li
+                                                class="list-group-item d-flex justify-content-between align-items-center ps-3 py-2">
+                                                <div class="d-flex align-items-start">
+                                                    <a href="{{ url_for('toggle_item', item_id=item.id, trip_id=trip.id, status=item.is_completed, filter_user=active_filter) }}"
+                                                        class="text-decoration-none text-body d-flex align-items-start">
+                                                        {% if item.is_completed %}
+                                                        <i
+                                                            class="bi bi-check-circle-fill text-success me-2 mt-1 fs-5"></i>
+                                                        <div>
+                                                            <span class="text-decoration-line-through text-muted">{{
+                                                                item.text }}</span>
+                                                            {% else %}
+                                                            <i class="bi bi-circle text-secondary me-2 mt-1 fs-5"></i>
+                                                            <div>
+                                                                <span class="fw-medium">{{ item.text }}</span>
+                                                                {% endif %}
+                                                                {% if item.note %}
+                                                                <div class="text-muted fst-italic small mt-1">
+                                                                    {{ item.note }}
+                                                                    <a href="#" class="text-secondary ms-1"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#editNoteModal"
+                                                                        data-item-id="{{ item.id }}"
+                                                                        data-item-note="{{ item.note }}"
+                                                                        onclick="setupEditNote(this)">
+                                                                        <i class="bi bi-pencil-fill"
+                                                                            style="font-size: 0.7em;"></i>
+                                                                    </a>
+                                                                </div>
+                                                                {% else %}
+                                                                <div class="small mt-1">
+                                                                    <a href="#"
+                                                                        class="text-muted text-decoration-none opacity-50 hover-opacity-100"
+                                                                        data-bs-toggle="modal"
+                                                                        data-bs-target="#editNoteModal"
+                                                                        data-item-id="{{ item.id }}" data-item-note=""
+                                                                        onclick="setupEditNote(this)">
+                                                                        <i class="bi bi-pencil-fill"
+                                                                            style="font-size: 0.7em;"></i>
+                                                                        <span class="fst-italic">Add Note</span>
+                                                                    </a>
+                                                                </div>
+                                                                {% endif %}
+                                                            </div>
+                                                    </a>
+                                                    {% if item.added_by_name %}
+                                                    <div class="ms-3 pt-1 d-none d-md-block">
+                                                        <small class="text-muted" style="font-size: 0.75rem;">
+                                                            Added by {{ item.added_by_name }}
+                                                            {% if item.created_at_formatted %} on {{
+                                                            item.created_at_formatted }}{% endif %}
+                                                        </small>
                                                     </div>
                                                     {% endif %}
                                                 </div>
-                                        </a>
-                                        {% if item.added_by_name %}
-                                        <div class="ms-3 pt-1 d-none d-md-block">
-                                            <small class="text-muted" style="font-size: 0.75rem;">
-                                                Added by {{ item.added_by_name }}
-                                                {% if item.created_at_formatted %} on {{ item.created_at_formatted }}{%
-                                                endif %}
-                                            </small>
-                                        </div>
-                                        {% endif %}
+                                                <a href="{{ url_for('delete_item', item_id=item.id, trip_id=trip.id, filter_user=active_filter) }}"
+                                                    class="btn btn-link text-danger p-0 ms-2">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
                                     </div>
-                                    <a href="{{ url_for('delete_item', item_id=item.id, trip_id=trip.id, filter_user=active_filter) }}"
-                                        class="btn btn-link text-danger p-0 ms-2">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </li>
-                                {% endfor %}
-                            </ul>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                            {% else %}
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-list-check fs-1 mb-2 d-block opacity-25"></i>
+                                Your packing list is empty. Add items to get started!
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
-                {% endif %}
-                {% endfor %}
-                {% else %}
-                <div class="text-center text-muted py-4">
-                    Your packing list is empty. Add items to get started!
+            </div>
+
+            <!-- Private Notes Tab -->
+            <div class="tab-pane fade {% if request.args.get('active_tab') == 'notes' %}show active{% endif %}"
+                id="notes" role="tabpanel" aria-labelledby="notes-tab">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <!-- Add Note Column -->
+                            <div class="col-md-4 order-md-2">
+                                <div class="card border-0 shadow-sm">
+                                    <div class="card-header fw-bold text-primary">Add Note</div>
+                                    <div class="card-body">
+                                        <form action="{{ url_for('save_note_route', trip_id=trip.id) }}" method="POST">
+                                            <input type="hidden" name="filter_user" value="{{ active_filter }}">
+                                            <div class="mb-3">
+                                                <textarea class="form-control" name="content" rows="4"
+                                                    placeholder="Type your note here..." required></textarea>
+                                            </div>
+                                            <div class="d-grid">
+                                                <button type="submit" class="btn btn-primary">
+                                                    <i class="bi bi-plus-lg"></i> Add Note
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Notes List Column -->
+                            <div class="col-md-8 order-md-1">
+                                <h5 class="mb-3 text-secondary">My Notes</h5>
+                                {% if private_note and private_note|length > 0 %}
+                                {% if private_note is string %}
+                                <!-- Legacy Support -->
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body">
+                                        <p class="mb-0 text-pre-wrap">{{ private_note }}</p>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <!-- Stack View -->
+                                {% for note in private_note|reverse %}
+                                <div class="card mb-3 border-0 shadow-sm">
+                                    <div class="card-body d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <p class="mb-0 text-pre-wrap">{{ note.text }}</p>
+                                            <small class="text-muted opacity-75">{{ note.created_at[:10] }}</small>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-info ms-3 rounded-circle"
+                                            data-bs-toggle="modal" data-bs-target="#addReminderModal"
+                                            data-note="{{ note.text }}" onclick="setReminderSource(this)">
+                                            <i class="bi bi-bell"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+                                {% else %}
+                                <div class="text-center text-muted py-5">
+                                    <i class="bi bi-journal-text fs-1 mb-2 d-block opacity-25"></i>
+                                    No private notes yet.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
+            </div>
+
+            <!-- AI Tab -->
+            <div class="tab-pane fade {% if request.args.get('active_tab') == 'ai' %}show active{% endif %}" id="ai"
+                role="tabpanel" aria-labelledby="ai-tab">
+                <div class="card shadow rounded-3 border-0"
+                    style="height: 600px; display: flex; flex-direction: column;">
+                    <div class="card-header bg-dark text-white py-3 d-flex align-items-center">
+                        <i class="bi bi-robot fs-4 me-2 text-info"></i>
+                        <h5 class="mb-0">Travel Assistant</h5>
+                    </div>
+
+                    <div class="card-body p-0 d-flex flex-column" style="overflow: hidden;">
+                        <!-- Messages Area -->
+                        <div id="chat-messages" class="flex-grow-1 p-3 overflow-auto">
+                            <!-- Helper Text -->
+                            <div class="text-center text-secondary small my-3 user-select-none">
+                                <i class="bi bi-stars mb-1 d-block fs-3"></i>
+                                Ask me to suggest items, verify your list, or just chat about your trip!
+                            </div>
+                        </div>
+
+                        <!-- Input Area -->
+                        <div class="p-3 border-top border-secondary">
+                            <div class="input-group">
+                                <input type="text" id="chat-input" class="form-control border-secondary"
+                                    placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendChat()">
+                                <button class="btn btn-info" onclick="sendChat()">
+                                    <i class="bi bi-send-fill text-dark"></i>
+                                </button>
+                            </div>
+                            <div class="text-center mt-2">
+                                <small class="text-secondary" style="font-size: 0.7rem;">Powered by Gemini AI</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -174,6 +322,38 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Send Invite</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Reminder Modal -->
+<div class="modal fade" id="addReminderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Set Google Reminder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_reminder_route', trip_id=trip.id) }}" method="POST">
+                <input type="hidden" name="filter_user" value="{{ active_filter }}">
+                <!-- Hidden source field not used by backend yet but good for logic -->
+                <input type="hidden" id="reminder-source" value="trip">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="summary" class="form-label">Reminder Title</label>
+                        <input type="text" class="form-control" id="reminder-summary" name="summary"
+                            value="{{ trip.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="date" class="form-label">Date & Time</label>
+                        <input type="datetime-local" class="form-control" name="date" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add to Calendar</button>
                 </div>
             </form>
         </div>
@@ -289,6 +469,139 @@
 
         var input = document.getElementById('edit_note');
         input.value = currentNote;
+    }
+
+    function setReminderSource(arg) {
+        const summaryInput = document.getElementById('reminder-summary');
+        if (arg === 'trip') {
+            summaryInput.value = '{{ trip.name }}';
+        } else if (arg && arg.getAttribute) {
+            // It's an element
+            summaryInput.value = arg.getAttribute('data-note');
+        }
+    }
+
+    // AI Chat Functions
+    const tripId = '{{ trip.id }}';
+
+    function sendChat() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        appendMessage('You', message, 'user');
+        input.value = '';
+        input.disabled = true;
+
+        // Show typing...
+        const loadingId = appendMessage('AI', 'Thinking...', 'ai', true);
+
+        fetch(`/trip/${tripId}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        })
+            .then(res => res.json())
+            .then(data => {
+                removeMessage(loadingId);
+                if (data.reply) {
+                    appendMessage('Travel Assistant', data.reply, 'ai');
+                }
+                if (data.actions && data.actions.length > 0) {
+                    appendConfirmation(data.actions);
+                }
+                input.disabled = false;
+                input.focus();
+            })
+            .catch(err => {
+                removeMessage(loadingId);
+                appendMessage('AI', 'Error connecting to AI.', 'ai');
+                input.disabled = false;
+                console.error(err);
+            });
+    }
+
+    function appendMessage(sender, text, type, isTemp = false) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = `d-flex mb-3 ${type === 'user' ? 'justify-content-end' : 'justify-content-start'}`;
+
+        // Use custom classes defined in style.css
+        const bubbleClass = type === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai';
+
+        div.innerHTML = `
+            <div class="card shadow-sm border-0 ${bubbleClass}" style="max-width: 80%;">
+                <div class="card-body p-2 px-3">
+                    <div class="small fw-bold mb-1 opacity-75">${sender}</div>
+                    <div class="text-break">${text}</div>
+                </div>
+            </div>
+        `;
+
+        if (isTemp) div.id = 'temp-msg-' + Date.now();
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return div.id;
+    }
+
+
+
+    function removeMessage(id) {
+        if (id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+    }
+
+    let currentActions = [];
+
+    function appendConfirmation(actions) {
+        currentActions = actions;
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'd-flex mb-3 justify-content-start';
+
+        let rows = actions.map(a => `
+            <tr>
+                <td><span class="badge ${a.type === 'add' ? 'bg-success' : 'bg-danger'}">${a.type | upper}</span></td>
+                <td>${a.item}</td>
+                <td class="small opacity-75">${a.category || ''}</td>
+            </tr>`).join('');
+
+        div.innerHTML = `
+            <div class="card bg-secondary text-white border-0 shadow-sm" style="max-width: 90%; min-width: 300px;">
+                <div class="card-header bg-dark bg-opacity-50 py-2">
+                    <small>Proposed Changes</small>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-dark table-striped mb-0 small" style="background-color: transparent;">
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+                <div class="card-footer bg-dark bg-opacity-25 p-2 text-end">
+                    <button class="btn btn-sm btn-info text-dark fw-bold" onclick="confirmActions(this)"><i class="bi bi-check-lg"></i> Confirm</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function confirmActions(btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Processing...';
+
+        fetch(`/trip/${tripId}/chat/confirm`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ actions: currentActions })
+        })
+            .then(res => res.json())
+            .then(data => {
+                btn.innerHTML = 'Done!';
+                // Reload page to show items
+                window.location.href = window.location.href.split('?')[0] + '?active_tab=packing';
+            });
     }
 </script>
 {% endblock %}
