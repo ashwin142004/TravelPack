@@ -320,3 +320,125 @@ def save_user_trip_note(trip_id, user_id, content):
     except Exception as e:
         print(f"Error saving private note: {e}")
         return False
+
+def update_user_trip_note(trip_id, user_id, note_id, new_content):
+    if not db:
+        return False
+    try:
+        doc_ref = db.collection('trips').document(trip_id).collection('private_notes').document(user_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            notes = data.get('notes', [])
+            updated = False
+            for note in notes:
+                if note.get('id') == note_id:
+                    note['text'] = new_content
+                    # Update timestamp if desired
+                    from datetime import datetime
+                    note['updated_at'] = datetime.now().isoformat()
+                    updated = True
+                    break
+            
+            if updated:
+                doc_ref.update({'notes': notes})
+                return True
+        return False
+    except Exception as e:
+        print(f"Error updating private note: {e}")
+        return False
+
+def delete_user_trip_note(trip_id, user_id, note_id):
+    if not db:
+        return False
+    try:
+        doc_ref = db.collection('trips').document(trip_id).collection('private_notes').document(user_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            notes = data.get('notes', [])
+            # Filter out the note to delete
+            new_notes = [n for n in notes if n.get('id') != note_id]
+            
+            if len(notes) != len(new_notes):
+                doc_ref.update({'notes': new_notes})
+                return True
+        return False
+    except Exception as e:
+        print(f"Error deleting private note: {e}")
+        return False
+
+# Notification Functions
+def get_upcoming_trips_for_notifications():
+    """
+    Returns a list of trips that are starting within the next few days
+    and need notifications.
+    """
+    if not db:
+        return []
+        
+    try:
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        # Look ahead up to 5 days
+        upcoming_limit = now + timedelta(days=5)
+        
+        # We need to query trips. 
+        # Ideally, we should filter by start_date >= now and start_date <= upcoming_limit.
+        # However, start_date is stored as string 'YYYY-MM-DD' in this app (based on add_trip).
+        # We can do string comparison if format is consistent.
+        
+        today_str = now.strftime('%Y-%m-%d')
+        limit_str = upcoming_limit.strftime('%Y-%m-%d')
+        
+        trips = []
+        # Querying all trips is inefficient but for this scale it might be ok.
+        # Better: use range query on `start_date`.
+        
+        docs = db.collection('trips').where('start_date', '>=', today_str).where('start_date', '<=', limit_str).stream()
+        
+        for doc in docs:
+            trip = doc.to_dict()
+            trip['id'] = doc.id
+            trips.append(trip)
+            
+        return trips
+    except Exception as e:
+        print(f"Error fetching upcoming trips: {e}")
+        return []
+
+def log_notification(trip_id, user_email, notification_type):
+    if not db:
+        return
+    try:
+        # Log to a subcollection 'notifications' in the trip or a global one
+        # For this requirement, we mainly need to track WHEN we sent it to respect frequency.
+        # We will update the trip document with 'last_notification_sent' and 'notification_count_today'
+        # Resetting 'notification_count_today' needs to happen too, or we just track timestamps.
+        
+        # Simpler approach: Store 'last_notification_timestamp' on the trip.
+        pass # Actual logic handled in update_trip_last_notification for the state
+        
+        # We can also add a record to a history collection
+        db.collection('notification_logs').add({
+            'trip_id': trip_id,
+            'user_email': user_email,
+            'type': notification_type,
+            'timestamp': firestore.SERVER_TIMESTAMP
+        })
+        print(f"Logged notification for {trip_id} to {user_email}")
+
+    except Exception as e:
+        print(f"Error logging notification: {e}")
+
+def update_trip_notification_status(trip_id, timestamp):
+    if not db:
+        return
+    try:
+        db.collection('trips').document(trip_id).update({
+            'last_notification_sent': timestamp
+        })
+    except Exception as e:
+        print(f"Error updating trip notification status: {e}")
+
+

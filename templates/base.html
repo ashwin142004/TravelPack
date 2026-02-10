@@ -7,40 +7,57 @@
     <title>TravelPack</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="#">TravelPack</a>
-            <div class="d-flex align-items-center">
-                <button class="btn btn-link text-white me-3 p-0" id="themeToggle" title="Toggle Theme">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <i class="bi bi-airplane-engines-fill text-primary"></i>
+                <span class="text-gradient">TravelPack</span>
+            </a>
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" id="themeToggle" title="Toggle Theme"
+                    style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
                     <i class="bi bi-moon-stars-fill"></i>
                 </button>
                 {% if session.get('user') %}
-                <img src="{{ session['user'].get('picture') }}" alt="Profile" class="rounded-circle me-2" width="32"
-                    height="32">
-                <span class="text-white me-3 d-none d-md-inline">{{ session['user'].get('name') }}</span>
-                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">Logout</a>
+                <div class="d-flex align-items-center gap-2">
+                    <img src="{{ session['user'].get('picture') }}" alt="Profile"
+                        class="rounded-circle border border-2 border-primary" width="32" height="32">
+                    <span class="fw-medium d-none d-md-inline">{{ session['user'].get('name') }}</span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger ms-2">Logout</a>
+                </div>
                 {% endif %}
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container mt-4 animate-fade-in">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div class="toast-container position-fixed bottom-0 end-0 p-3">
+            {% for category, message in messages %}
+            <div class="toast align-items-center text-bg-{{ category }} border-0 show" role="alert"
+                aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        {{ message }}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                        aria-label="Close"></button>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
         {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
     </div>
+
+    {% block modals %}{% endblock %}
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -50,7 +67,7 @@
         const icon = themeToggle.querySelector('i');
 
         // Check local storage
-        const currentTheme = localStorage.getItem('theme') || 'light';
+        const currentTheme = localStorage.getItem('theme') || 'dark'; // Default to dark for premium feel
         htmlElement.setAttribute('data-bs-theme', currentTheme);
         updateIcon(currentTheme);
 

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, session, request, flash
 from authlib.integrations.flask_client import OAuth
-from firebase_service import initialize_firebase, get_all_trips, add_trip, delete_trip
+from firebase_service import initialize_firebase, get_all_trips, add_trip, delete_trip, update_user_trip_note, delete_user_trip_note, get_upcoming_trips_for_notifications, update_trip_notification_status, log_notification
 import os
 from dotenv import load_dotenv
 
@@ -384,6 +384,88 @@ def chat_confirm_route(trip_id):
             count += 1
             
     return {'status': 'success', 'count': count}
+
+@app.route('/trip/<trip_id>/note/<note_id>/update', methods=['POST'])
+def update_private_note_route(trip_id, note_id):
+    user = session.get('user')
+    if not user:
+        return {'error': 'Unauthorized'}, 401
+    
+    data = request.get_json()
+    new_content = data.get('note')
+    
+    if update_user_trip_note(trip_id, user.get('sub'), note_id, new_content):
+        return {'status': 'success'}
+    return {'error': 'Failed to update'}, 500
+
+@app.route('/trip/<trip_id>/note/<note_id>/delete', methods=['DELETE'])
+def delete_private_note_route(trip_id, note_id):
+    user = session.get('user')
+    if not user:
+        return {'error': 'Unauthorized'}, 401
+        
+    if delete_user_trip_note(trip_id, user.get('sub'), note_id):
+        return {'status': 'success'}
+    return {'error': 'Failed to delete'}, 500
+
+# Cron Job for Notifications
+@app.route('/api/cron/reminders')
+def cron_reminders():
+    """
+    Triggered by Vercel Cron.
+    Checks upcoming trips and logic for frequency.
+    """
+    trips = get_upcoming_trips_for_notifications()
+    count = 0
+    
+    from datetime import datetime
+    now = datetime.now()
+    
+    for trip in trips:
+        start_date_str = trip.get('start_date')
+        if not start_date_str:
+            continue
+            
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            delta = start_date - now
+            days_diff = delta.days
+            
+            should_send = False
+            last_sent = trip.get('last_notification_sent')
+            
+            hours_since_last = 9999
+            if last_sent:
+                last_sent_dt = last_sent.replace(tzinfo=None) # naive comparison
+                hours_since_last = (now - last_sent_dt).total_seconds() / 3600
+                
+            if 3 <= days_diff <= 4:
+                if hours_since_last >= 24:
+                    should_send = True
+            elif days_diff == 2:
+                if hours_since_last >= 12:
+                    should_send = True
+            elif days_diff <= 1 and days_diff >= 0:
+                if hours_since_last >= 4:
+                    should_send = True
+            
+            if should_send:
+                owner_email = trip.get('owner_email')
+                if owner_email:
+                    print(f"SENDING NOTIFICATION TO {owner_email} for trip {trip.get('name')}")
+                    log_notification(trip['id'], owner_email, 'reminder')
+                    update_trip_notification_status(trip['id'], now)
+                    count += 1
+                    
+        except ValueError:
+            continue
+            
+    return {'status': 'success', 'processed': len(trips), 'sent': count}
+
+
+
+# Cron Job for Notifications
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
