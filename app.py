@@ -439,14 +439,8 @@ def cron_reminders():
                 last_sent_dt = last_sent.replace(tzinfo=None) # naive comparison
                 hours_since_last = (now - last_sent_dt).total_seconds() / 3600
                 
-            if 3 <= days_diff <= 4:
-                if hours_since_last >= 24:
-                    should_send = True
-            elif days_diff == 2:
-                if hours_since_last >= 12:
-                    should_send = True
-            elif days_diff <= 1 and days_diff >= 0:
-                if hours_since_last >= 4:
+            if 0 <= days_diff <= 4:
+                if hours_since_last >= 20:
                     should_send = True
             
             if should_send:
